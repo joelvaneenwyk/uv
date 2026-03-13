@@ -1023,7 +1023,10 @@ mod tests {
 
     #[test]
     fn test_gui_executable_resolves_pythonw() {
-        let temp_dir = std::env::temp_dir().join("uv-test-gui-executable");
+        let temp_dir = std::env::temp_dir().join(format!(
+            "uv-test-gui-executable-{}",
+            std::process::id()
+        ));
         let _ = fs_err::remove_dir_all(&temp_dir);
         fs_err::create_dir_all(&temp_dir).unwrap();
 
@@ -1043,7 +1046,10 @@ mod tests {
 
     #[test]
     fn test_gui_executable_non_python_name() {
-        let temp_dir = std::env::temp_dir().join("uv-test-gui-executable-non-python");
+        let temp_dir = std::env::temp_dir().join(format!(
+            "uv-test-gui-executable-non-python-{}",
+            std::process::id()
+        ));
         let _ = fs_err::remove_dir_all(&temp_dir);
         fs_err::create_dir_all(&temp_dir).unwrap();
 
