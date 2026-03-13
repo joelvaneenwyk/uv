@@ -298,25 +298,45 @@ pub(crate) fn create(
     if cfg!(windows) {
         if using_minor_version_link {
             let target = scripts.join(WindowsExecutable::Python.exe(interpreter));
-            replace_link_to_executable(target.as_path(), &executable_target)
-                .map_err(Error::Python)?;
+            replace_link_to_executable(
+                target.as_path(),
+                &executable_target,
+                WindowsExecutable::Python.is_gui(),
+            )
+            .map_err(Error::Python)?;
             let targetw = scripts.join(WindowsExecutable::Pythonw.exe(interpreter));
-            replace_link_to_executable(targetw.as_path(), &executable_target)
-                .map_err(Error::Python)?;
+            replace_link_to_executable(
+                targetw.as_path(),
+                &executable_target,
+                WindowsExecutable::Pythonw.is_gui(),
+            )
+            .map_err(Error::Python)?;
             if interpreter.gil_disabled() {
                 let targett = scripts.join(WindowsExecutable::PythonMajorMinort.exe(interpreter));
-                replace_link_to_executable(targett.as_path(), &executable_target)
-                    .map_err(Error::Python)?;
+                replace_link_to_executable(
+                    targett.as_path(),
+                    &executable_target,
+                    WindowsExecutable::PythonMajorMinort.is_gui(),
+                )
+                .map_err(Error::Python)?;
                 let targetwt = scripts.join(WindowsExecutable::PythonwMajorMinort.exe(interpreter));
-                replace_link_to_executable(targetwt.as_path(), &executable_target)
-                    .map_err(Error::Python)?;
+                replace_link_to_executable(
+                    targetwt.as_path(),
+                    &executable_target,
+                    WindowsExecutable::PythonwMajorMinort.is_gui(),
+                )
+                .map_err(Error::Python)?;
             }
         } else if matches!(interpreter.platform().os(), Os::Pyodide { .. }) {
             // For Pyodide, link only `python.exe`.
             // This should not be copied as `python.exe` is a wrapper that launches Pyodide.
             let target = scripts.join(WindowsExecutable::Python.exe(interpreter));
-            replace_link_to_executable(target.as_path(), &executable_target)
-                .map_err(Error::Python)?;
+            replace_link_to_executable(
+                target.as_path(),
+                &executable_target,
+                WindowsExecutable::Python.is_gui(),
+            )
+            .map_err(Error::Python)?;
         } else {
             // Always copy `python.exe`.
             copy_launcher_windows(
@@ -814,6 +834,19 @@ impl WindowsExecutable {
             Self::PyPyw | Self::PyPyMajorMinorw => "venvwlauncher.exe",
             Self::GraalPy => "venvlauncher.exe",
         }
+    }
+
+    /// Whether this executable is a GUI-subsystem binary (no console window).
+    ///
+    /// On Windows, GUI-subsystem executables (e.g. `pythonw.exe`) run without
+    /// allocating or attaching to a console window. This is important for GUI
+    /// applications, background tasks, and scheduled jobs that should not show
+    /// a console.
+    fn is_gui(self) -> bool {
+        matches!(
+            self,
+            Self::Pythonw | Self::PythonwMajorMinort | Self::PyPyw | Self::PyPyMajorMinorw
+        )
     }
 }
 

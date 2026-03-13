@@ -912,7 +912,15 @@ fn executable_path_from_base(
 /// Create a link to a managed Python executable.
 ///
 /// If the file already exists at the link path, an error will be returned.
-pub fn create_link_to_executable(link: &Path, executable: &Path) -> Result<(), Error> {
+///
+/// On Windows, the `is_gui` parameter controls whether the created trampoline uses the
+/// GUI subsystem (`pythonw.exe`-style, no console window) or the console subsystem
+/// (`python.exe`-style). On Unix, this parameter is ignored as symlinks are used instead.
+pub fn create_link_to_executable(
+    link: &Path,
+    executable: &Path,
+    is_gui: bool,
+) -> Result<(), Error> {
     let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
     fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
 
@@ -928,8 +936,7 @@ pub fn create_link_to_executable(link: &Path, executable: &Path) -> Result<(), E
     } else if cfg!(windows) {
         use uv_trampoline_builder::windows_python_launcher;
 
-        // TODO(zanieb): Install GUI launchers as well
-        let launcher = windows_python_launcher(executable, false)?;
+        let launcher = windows_python_launcher(executable, is_gui)?;
 
         // OK to use `std::fs` here, `fs_err` does not support `File::create_new` and we attach
         // error context anyway
@@ -948,8 +955,16 @@ pub fn create_link_to_executable(link: &Path, executable: &Path) -> Result<(), E
 ///
 /// If a file already exists at the link path, it will be atomically replaced.
 ///
+/// On Windows, the `is_gui` parameter controls whether the created trampoline uses the
+/// GUI subsystem (`pythonw.exe`-style, no console window) or the console subsystem
+/// (`python.exe`-style). On Unix, this parameter is ignored as symlinks are used instead.
+///
 /// See [`create_link_to_executable`] for a variant that errors if the link already exists.
-pub fn replace_link_to_executable(link: &Path, executable: &Path) -> Result<(), Error> {
+pub fn replace_link_to_executable(
+    link: &Path,
+    executable: &Path,
+    is_gui: bool,
+) -> Result<(), Error> {
     let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
     fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
 
@@ -958,7 +973,7 @@ pub fn replace_link_to_executable(link: &Path, executable: &Path) -> Result<(), 
     } else if cfg!(windows) {
         use uv_trampoline_builder::windows_python_launcher;
 
-        let launcher = windows_python_launcher(executable, false)?;
+        let launcher = windows_python_launcher(executable, is_gui)?;
 
         uv_fs::write_atomic_sync(link, &*launcher).map_err(Error::LinkExecutable)
     } else {
