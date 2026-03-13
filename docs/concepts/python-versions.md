@@ -497,3 +497,29 @@ $ py -V:Astral/CPython3.13.1
 
 On uninstall, uv will remove the registry entry for the target version as well as any broken
 registry entries.
+
+## Windows Python launchers
+
+On Windows, virtual environments contain Python launchers — small `.exe` files that act as entry
+points for the Python interpreter. There are two types of launchers, distinguished by their
+[PE subsystem](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#windows-subsystem):
+
+- **Console launchers** (`python.exe`): Use the `CONSOLE` subsystem and allocate or attach to a
+  console window. These are used for command-line scripts and interactive Python sessions.
+- **GUI launchers** (`pythonw.exe`): Use the `WINDOWS` (GUI) subsystem and run without creating or
+  attaching to a console window. These are used for GUI applications, background tasks, scheduled
+  jobs, and silent utility scripts.
+
+When creating virtual environments with `uv venv`, uv produces both `python.exe` and `pythonw.exe`
+in the `Scripts` directory. The `pythonw.exe` launcher uses the GUI subsystem so that running
+scripts with it does not flash a console window:
+
+```pwsh-session
+PS> uv venv
+PS> .venv\Scripts\pythonw.exe my_gui_app.py
+```
+
+!!! tip
+
+    Use `pythonw.exe` when running GUI applications (e.g., tkinter, PyQt), background services,
+    or scheduled tasks where a console window would be undesirable.

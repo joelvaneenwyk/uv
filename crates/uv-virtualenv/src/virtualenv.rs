@@ -973,3 +973,27 @@ fn copy_launcher_windows(
 
     Err(Error::NotFound(base_python.user_display().to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_windows_executable_is_gui() {
+        // Console executables should not be GUI
+        assert!(!WindowsExecutable::Python.is_gui());
+        assert!(!WindowsExecutable::PythonMajor.is_gui());
+        assert!(!WindowsExecutable::PythonMajorMinor.is_gui());
+        assert!(!WindowsExecutable::PythonMajorMinort.is_gui());
+        assert!(!WindowsExecutable::PyPy.is_gui());
+        assert!(!WindowsExecutable::PyPyMajor.is_gui());
+        assert!(!WindowsExecutable::PyPyMajorMinor.is_gui());
+        assert!(!WindowsExecutable::GraalPy.is_gui());
+
+        // GUI executables (the "w" variants) should be GUI
+        assert!(WindowsExecutable::Pythonw.is_gui());
+        assert!(WindowsExecutable::PythonwMajorMinort.is_gui());
+        assert!(WindowsExecutable::PyPyw.is_gui());
+        assert!(WindowsExecutable::PyPyMajorMinorw.is_gui());
+    }
+}
