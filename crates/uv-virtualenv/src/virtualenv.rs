@@ -3,7 +3,7 @@
 use std::env::consts::EXE_SUFFIX;
 use std::io;
 use std::io::{BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use console::Term;
 use fs_err::File;
@@ -304,10 +304,15 @@ pub(crate) fn create(
                 WindowsExecutable::Python.is_gui(),
             )
             .map_err(Error::Python)?;
+            // For GUI executables, resolve to the corresponding `pythonw.exe` in the
+            // base Python installation so the spawned child is also a GUI-subsystem
+            // process and no console window is created.
+            let gui_executable_target =
+                gui_executable(&executable_target).unwrap_or(executable_target.clone());
             let targetw = scripts.join(WindowsExecutable::Pythonw.exe(interpreter));
             replace_link_to_executable(
                 targetw.as_path(),
-                &executable_target,
+                &gui_executable_target,
                 WindowsExecutable::Pythonw.is_gui(),
             )
             .map_err(Error::Python)?;
@@ -322,7 +327,7 @@ pub(crate) fn create(
                 let targetwt = scripts.join(WindowsExecutable::PythonwMajorMinort.exe(interpreter));
                 replace_link_to_executable(
                     targetwt.as_path(),
-                    &executable_target,
+                    &gui_executable_target,
                     WindowsExecutable::PythonwMajorMinort.is_gui(),
                 )
                 .map_err(Error::Python)?;
@@ -850,6 +855,25 @@ impl WindowsExecutable {
     }
 }
 
+/// Resolve the GUI-subsystem executable path from a console-subsystem Python executable.
+///
+/// Given a path like `.../python.exe`, returns `.../pythonw.exe` if it exists.
+/// Returns `None` if the GUI executable does not exist or if the filename
+/// cannot be converted to a string.
+fn gui_executable(console_executable: &Path) -> Option<PathBuf> {
+    let name = console_executable.file_name()?.to_str()?;
+    let gui_name = name.replace("python", "pythonw");
+    if gui_name == name {
+        return None;
+    }
+    let gui_path = console_executable.with_file_name(gui_name);
+    if gui_path.exists() {
+        Some(gui_path)
+    } else {
+        None
+    }
+}
+
 /// <https://github.com/python/cpython/blob/d457345bbc6414db0443819290b04a9a4333313d/Lib/venv/__init__.py#L261-L267>
 /// <https://github.com/pypa/virtualenv/blob/d9fdf48d69f0d0ca56140cf0381edbb5d6fe09f5/src/virtualenv/create/via_global_ref/builtin/cpython/cpython3.py#L78-L83>
 ///
@@ -995,5 +1019,40 @@ mod tests {
         assert!(WindowsExecutable::PythonwMajorMinort.is_gui());
         assert!(WindowsExecutable::PyPyw.is_gui());
         assert!(WindowsExecutable::PyPyMajorMinorw.is_gui());
+    }
+
+    #[test]
+    fn test_gui_executable_resolves_pythonw() {
+        let temp_dir = std::env::temp_dir().join("uv-test-gui-executable");
+        let _ = fs_err::remove_dir_all(&temp_dir);
+        fs_err::create_dir_all(&temp_dir).unwrap();
+
+        let python = temp_dir.join("python.exe");
+        let pythonw = temp_dir.join("pythonw.exe");
+
+        // When pythonw.exe doesn't exist, returns None
+        fs_err::write(&python, b"").unwrap();
+        assert!(gui_executable(&python).is_none());
+
+        // When pythonw.exe exists, returns its path
+        fs_err::write(&pythonw, b"").unwrap();
+        assert_eq!(gui_executable(&python).unwrap(), pythonw);
+
+        let _ = fs_err::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_gui_executable_non_python_name() {
+        let temp_dir = std::env::temp_dir().join("uv-test-gui-executable-non-python");
+        let _ = fs_err::remove_dir_all(&temp_dir);
+        fs_err::create_dir_all(&temp_dir).unwrap();
+
+        let graalpy = temp_dir.join("graalpy.exe");
+        fs_err::write(&graalpy, b"").unwrap();
+
+        // Filenames without "python" in the name should return None
+        assert!(gui_executable(&graalpy).is_none());
+
+        let _ = fs_err::remove_dir_all(&temp_dir);
     }
 }

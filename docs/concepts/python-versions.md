@@ -510,14 +510,27 @@ points for the Python interpreter. There are two types of launchers, distinguish
   attaching to a console window. These are used for GUI applications, background tasks, scheduled
   jobs, and silent utility scripts.
 
-When creating virtual environments with `uv venv`, uv produces both `python.exe` and `pythonw.exe`
-in the `Scripts` directory. The `pythonw.exe` launcher uses the GUI subsystem so that running
-scripts with it does not flash a console window:
+For CPython and PyPy virtual environments, `uv venv` produces both `python.exe` and `pythonw.exe`
+in the `Scripts` directory. The `pythonw.exe` launcher uses the GUI subsystem and targets the
+base installation's `pythonw.exe`, so that running scripts with it does not flash a console window:
 
 ```pwsh-session
 PS> uv venv
 PS> .venv\Scripts\pythonw.exe my_gui_app.py
 ```
+
+!!! note
+
+    Some implementations do not include `pythonw.exe`. For example, Pyodide virtual environments
+    only contain `python.exe`. GraalPy virtual environments similarly may not include a GUI launcher.
+
+### GUI script entrypoints
+
+When installing Python packages that declare GUI script entrypoints (e.g., via `[project.gui-scripts]`
+in `pyproject.toml`), uv creates launchers that use the GUI subsystem and invoke `pythonw.exe`. This
+means GUI applications installed as packages will also run without a console window.
+
+Scripts with a `#!pythonw` shebang are likewise detected and installed with the GUI subsystem.
 
 !!! tip
 

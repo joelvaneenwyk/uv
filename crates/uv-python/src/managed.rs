@@ -915,7 +915,8 @@ fn executable_path_from_base(
 ///
 /// On Windows, the `is_gui` parameter controls whether the created trampoline uses the
 /// GUI subsystem (`pythonw.exe`-style, no console window) or the console subsystem
-/// (`python.exe`-style). On Unix, this parameter is ignored as symlinks are used instead.
+/// (`python.exe`-style). On Unix, this parameter is ignored as symlinks or copies are
+/// used instead.
 pub fn create_link_to_executable(
     link: &Path,
     executable: &Path,
@@ -957,7 +958,8 @@ pub fn create_link_to_executable(
 ///
 /// On Windows, the `is_gui` parameter controls whether the created trampoline uses the
 /// GUI subsystem (`pythonw.exe`-style, no console window) or the console subsystem
-/// (`python.exe`-style). On Unix, this parameter is ignored as symlinks are used instead.
+/// (`python.exe`-style). On Unix, this parameter is ignored as symlinks or copies are
+/// used instead.
 ///
 /// See [`create_link_to_executable`] for a variant that errors if the link already exists.
 pub fn replace_link_to_executable(
