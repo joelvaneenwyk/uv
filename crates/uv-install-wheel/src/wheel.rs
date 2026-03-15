@@ -155,7 +155,7 @@ fn get_script_executable(python_executable: &Path, is_gui: bool) -> PathBuf {
             .unwrap_or_else(|| {
                 warn!(
                     "GUI script target `pythonw.exe` not found next to `{}`, \
-                     falling back to `python.exe` (a console window may appear)",
+                     falling back to `python.exe`",
                     python_executable.simplified_display()
                 );
                 python_executable.to_path_buf()
