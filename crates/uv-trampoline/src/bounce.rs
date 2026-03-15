@@ -13,9 +13,9 @@ use windows::Win32::{
     System::Environment::GetCommandLineA,
     System::LibraryLoader::{FindResourceW, LoadResource, LockResource, SizeofResource},
     System::Threading::{
-        CreateProcessA, GetExitCodeProcess, GetStartupInfoA, INFINITE, PROCESS_CREATION_FLAGS,
-        PROCESS_INFORMATION, STARTF_USESTDHANDLES, STARTUPINFOA, WaitForInputIdle,
-        WaitForSingleObject,
+        CREATE_NO_WINDOW, CreateProcessA, GetExitCodeProcess, GetStartupInfoA, INFINITE,
+        PROCESS_CREATION_FLAGS, PROCESS_INFORMATION, STARTF_USESTDHANDLES, STARTUPINFOA,
+        WaitForInputIdle, WaitForSingleObject,
     },
     UI::WindowsAndMessaging::{
         CreateWindowExA, DestroyWindow, GetMessageA, HWND_MESSAGE, MSG, PEEK_MESSAGE_REMOVE_TYPE,
@@ -297,7 +297,7 @@ fn print_ctrl_handler_error_and_exit(err: uv_windows::CtrlHandlerError) -> ! {
     exit_with_status(1);
 }
 
-fn spawn_child(si: &STARTUPINFOA, child_cmdline: CString) -> HANDLE {
+fn spawn_child(si: &STARTUPINFOA, child_cmdline: CString, is_gui: bool) -> HANDLE {
     // See distlib/PC/launcher.c::run_child
     if (si.dwFlags & STARTF_USESTDHANDLES).0 != 0 {
         // ignore errors, if the handles are not inheritable/valid, then nothing we can do
@@ -308,6 +308,14 @@ fn spawn_child(si: &STARTUPINFOA, child_cmdline: CString) -> HANDLE {
         unsafe { SetHandleInformation(si.hStdError, HANDLE_FLAG_INHERIT.0, HANDLE_FLAG_INHERIT) }
             .unwrap_or_else(|_| warn!("Making stderr inheritable failed"));
     }
+    // For GUI launchers, use CREATE_NO_WINDOW to prevent a console window from
+    // appearing when the child process is a console-subsystem binary (e.g. when
+    // pythonw.exe is unavailable and python.exe is used as a fallback).
+    let creation_flags = if is_gui {
+        CREATE_NO_WINDOW
+    } else {
+        PROCESS_CREATION_FLAGS(0)
+    };
     let mut child_process_info = PROCESS_INFORMATION::default();
     unsafe {
         CreateProcessA(
@@ -318,7 +326,7 @@ fn spawn_child(si: &STARTUPINFOA, child_cmdline: CString) -> HANDLE {
             None,
             None,
             true,
-            PROCESS_CREATION_FLAGS(0),
+            creation_flags,
             None,
             None,
             si,
@@ -447,7 +455,7 @@ pub fn bounce(is_gui: bool) -> ! {
     let mut si = STARTUPINFOA::default();
     unsafe { GetStartupInfoA(&mut si) }
 
-    let child_handle = spawn_child(&si, child_cmdline);
+    let child_handle = spawn_child(&si, child_cmdline, is_gui);
     let job = Job::new().unwrap_or_else(|e| {
         print_job_error_and_exit("uv trampoline failed to create job object", e);
     });
