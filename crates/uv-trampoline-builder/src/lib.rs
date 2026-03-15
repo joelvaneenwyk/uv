@@ -815,16 +815,31 @@ mod pe_subsystem_tests {
 
     /// Read the PE subsystem value from a Windows PE binary.
     fn read_pe_subsystem(data: &[u8]) -> u16 {
-        // Read PE header offset from the DOS header at 0x3C.
+        // Ensure we can read the PE header offset from the DOS header at 0x3C.
+        assert!(
+            data.len() >= 0x40,
+            "PE binary too small to contain DOS header (need at least 64 bytes, got {})",
+            data.len()
+        );
         let pe_offset = u32::from_le_bytes(data[0x3C..0x40].try_into().expect("4 bytes")) as usize;
 
         // Verify PE signature ("PE\0\0").
+        assert!(
+            data.len() >= pe_offset + 4,
+            "PE binary too small to contain PE signature at offset {pe_offset} (file is {} bytes)",
+            data.len()
+        );
         assert_eq!(&data[pe_offset..pe_offset + 4], b"PE\0\0", "Invalid PE signature");
 
         // The optional header starts at pe_offset + 24.
         // For both PE32 and PE32+, the subsystem field is at offset 68 from the
         // start of the optional header.
         let subsystem_offset = pe_offset + 24 + 68;
+        assert!(
+            data.len() >= subsystem_offset + 2,
+            "PE binary too small to contain subsystem field at offset {subsystem_offset} (file is {} bytes)",
+            data.len()
+        );
         u16::from_le_bytes(
             data[subsystem_offset..subsystem_offset + 2]
                 .try_into()
@@ -832,8 +847,8 @@ mod pe_subsystem_tests {
         )
     }
 
-    /// Verify that each pre-compiled GUI trampoline uses the WINDOWS_GUI subsystem
-    /// and each console trampoline uses the WINDOWS_CUI subsystem.
+    /// Verify that each pre-compiled GUI trampoline uses the `WINDOWS_GUI` subsystem
+    /// and each console trampoline uses the `WINDOWS_CUI` subsystem.
     #[test]
     fn prebuilt_trampolines_have_correct_subsystem() {
         let trampolines_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("trampolines");
@@ -847,7 +862,7 @@ mod pe_subsystem_tests {
             ("uv-trampoline-aarch64-console.exe", IMAGE_SUBSYSTEM_WINDOWS_CUI, "Console"),
         ] {
             let path = trampolines_dir.join(filename);
-            let data = std::fs::read(&path)
+            let data = fs_err::read(&path)
                 .unwrap_or_else(|e| panic!("Failed to read {filename}: {e}"));
             let subsystem = read_pe_subsystem(&data);
             assert_eq!(
