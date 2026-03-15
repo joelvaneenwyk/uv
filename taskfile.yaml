@@ -1,6 +1,6 @@
 # https://taskfile.dev
 
-version: '3'
+version: "3"
 
 vars:
   NIGHTLY: nightly-2025-11-02
@@ -34,7 +34,8 @@ tasks:
 
   setup:rust-src:
     desc: Add rust-src component for the current platform
-    aliases: ['setup:rust-src:linux', 'setup:rust-src:macos', 'setup:rust-src:windows']
+    aliases:
+      ["setup:rust-src:linux", "setup:rust-src:macos", "setup:rust-src:windows"]
     cmds:
       - rustup component add rust-src --toolchain {{.NIGHTLY}}
 
@@ -99,21 +100,21 @@ tasks:
   trampoline:build:xwin:i686:
     desc: Cross-compile trampoline for i686 (via cargo xwin)
     platforms: [linux, darwin]
-    dir: '{{.TRAMPOLINE_CRATE}}'
+    dir: "{{.TRAMPOLINE_CRATE}}"
     cmds:
       - cargo +{{.NIGHTLY}} xwin build --xwin-arch x86 --release --target i686-pc-windows-msvc
 
   trampoline:build:xwin:x86_64:
     desc: Cross-compile trampoline for x86_64 (via cargo xwin)
     platforms: [linux, darwin]
-    dir: '{{.TRAMPOLINE_CRATE}}'
+    dir: "{{.TRAMPOLINE_CRATE}}"
     cmds:
       - cargo +{{.NIGHTLY}} xwin build --release --target x86_64-pc-windows-msvc
 
   trampoline:build:xwin:aarch64:
     desc: Cross-compile trampoline for aarch64 (via cargo xwin)
     platforms: [linux, darwin]
-    dir: '{{.TRAMPOLINE_CRATE}}'
+    dir: "{{.TRAMPOLINE_CRATE}}"
     cmds:
       - cargo +{{.NIGHTLY}} xwin build --release --target aarch64-pc-windows-msvc
 
@@ -122,21 +123,21 @@ tasks:
   trampoline:build:native:i686:
     desc: Build trampoline for i686 natively on Windows
     platforms: [windows]
-    dir: '{{.TRAMPOLINE_CRATE}}'
+    dir: "{{.TRAMPOLINE_CRATE}}"
     cmds:
       - cargo build --release --target i686-pc-windows-msvc
 
   trampoline:build:native:x86_64:
     desc: Build trampoline for x86_64 natively on Windows
     platforms: [windows]
-    dir: '{{.TRAMPOLINE_CRATE}}'
+    dir: "{{.TRAMPOLINE_CRATE}}"
     cmds:
       - cargo build --release --target x86_64-pc-windows-msvc
 
   trampoline:build:native:aarch64:
     desc: Build trampoline for aarch64 natively on Windows
     platforms: [windows]
-    dir: '{{.TRAMPOLINE_CRATE}}'
+    dir: "{{.TRAMPOLINE_CRATE}}"
     cmds:
       - cargo build --release --target aarch64-pc-windows-msvc
 
@@ -147,9 +148,9 @@ tasks:
   trampoline:copy:
     desc: Copy built trampolines to uv-trampoline-builder/trampolines
     vars:
-      SRC_AARCH64: '{{.TRAMPOLINE_CRATE}}/target/aarch64-pc-windows-msvc/release'
-      SRC_X86_64: '{{.TRAMPOLINE_CRATE}}/target/x86_64-pc-windows-msvc/release'
-      SRC_I686: '{{.TRAMPOLINE_CRATE}}/target/i686-pc-windows-msvc/release'
+      SRC_AARCH64: "{{.TRAMPOLINE_CRATE}}/target/aarch64-pc-windows-msvc/release"
+      SRC_X86_64: "{{.TRAMPOLINE_CRATE}}/target/x86_64-pc-windows-msvc/release"
+      SRC_I686: "{{.TRAMPOLINE_CRATE}}/target/i686-pc-windows-msvc/release"
     cmds:
       - cmd: cp "{{.SRC_AARCH64}}/uv-trampoline-console.exe" "{{.TRAMPOLINE_DEST}}/uv-trampoline-aarch64-console.exe"
       - cmd: cp "{{.SRC_AARCH64}}/uv-trampoline-gui.exe" "{{.TRAMPOLINE_DEST}}/uv-trampoline-aarch64-gui.exe"
