@@ -806,3 +806,54 @@ if __name__ == "__main__":
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod pe_subsystem_tests {
+    /// Windows PE subsystem constants.
+    const IMAGE_SUBSYSTEM_WINDOWS_GUI: u16 = 2;
+    const IMAGE_SUBSYSTEM_WINDOWS_CUI: u16 = 3;
+
+    /// Read the PE subsystem value from a Windows PE binary.
+    fn read_pe_subsystem(data: &[u8]) -> u16 {
+        // Read PE header offset from the DOS header at 0x3C.
+        let pe_offset = u32::from_le_bytes(data[0x3C..0x40].try_into().expect("4 bytes")) as usize;
+
+        // Verify PE signature ("PE\0\0").
+        assert_eq!(&data[pe_offset..pe_offset + 4], b"PE\0\0", "Invalid PE signature");
+
+        // The optional header starts at pe_offset + 24.
+        // For both PE32 and PE32+, the subsystem field is at offset 68 from the
+        // start of the optional header.
+        let subsystem_offset = pe_offset + 24 + 68;
+        u16::from_le_bytes(
+            data[subsystem_offset..subsystem_offset + 2]
+                .try_into()
+                .expect("2 bytes"),
+        )
+    }
+
+    /// Verify that each pre-compiled GUI trampoline uses the WINDOWS_GUI subsystem
+    /// and each console trampoline uses the WINDOWS_CUI subsystem.
+    #[test]
+    fn prebuilt_trampolines_have_correct_subsystem() {
+        let trampolines_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("trampolines");
+
+        for (filename, expected_subsystem, label) in [
+            ("uv-trampoline-x86_64-gui.exe", IMAGE_SUBSYSTEM_WINDOWS_GUI, "GUI"),
+            ("uv-trampoline-x86_64-console.exe", IMAGE_SUBSYSTEM_WINDOWS_CUI, "Console"),
+            ("uv-trampoline-i686-gui.exe", IMAGE_SUBSYSTEM_WINDOWS_GUI, "GUI"),
+            ("uv-trampoline-i686-console.exe", IMAGE_SUBSYSTEM_WINDOWS_CUI, "Console"),
+            ("uv-trampoline-aarch64-gui.exe", IMAGE_SUBSYSTEM_WINDOWS_GUI, "GUI"),
+            ("uv-trampoline-aarch64-console.exe", IMAGE_SUBSYSTEM_WINDOWS_CUI, "Console"),
+        ] {
+            let path = trampolines_dir.join(filename);
+            let data = std::fs::read(&path)
+                .unwrap_or_else(|e| panic!("Failed to read {filename}: {e}"));
+            let subsystem = read_pe_subsystem(&data);
+            assert_eq!(
+                subsystem, expected_subsystem,
+                "{filename} should have {label} subsystem ({expected_subsystem}), got {subsystem}"
+            );
+        }
+    }
+}
