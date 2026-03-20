@@ -115,56 +115,73 @@ Added a [Taskfile](https://taskfile.dev) that automates the trampoline rebuild w
 
 ---
 
-## Proposed GitHub Issue
+## Proposed GitHub PR
 
 ### Title
 
-**Fix Windows GUI subsystem for `pythonw.exe` venv launchers and GUI script entrypoints**
+Fix `pythonw.exe` venv launcher using console subsystem on Windows
 
 ### Description
 
-**Problem**
+## Summary
 
-On Windows, `pythonw.exe` in virtual environments created by `uv venv` incorrectly uses the
-console PE subsystem instead of the GUI (Windows) subsystem. This causes a visible console window
-to flash or persist when running GUI applications, background tasks, or scheduled jobs through
-`pythonw.exe` or GUI script entrypoints.
+- Fix `pythonw.exe` in virtual environments using the console PE subsystem instead of the GUI
+  (Windows) subsystem, which causes unwanted console windows when running GUI applications
+- Pass `CREATE_NO_WINDOW` in the GUI trampoline's `CreateProcessA` call to suppress console window
+  allocation when the child process is a console binary (fallback scenario)
+- Add PE subsystem validation test, `pythonw.exe` fallback warning, and documentation for Windows
+  launcher behavior
 
-The root cause is twofold:
+## Problem
 
-1. **Venv creation**: `replace_link_to_executable` in `virtualenv.rs` hardcodes `is_gui=false`
-   when creating Windows trampoline launchers, so `pythonw.exe` gets the console subsystem.
-   Additionally, the `pythonw.exe` trampoline targets `python.exe` (console subsystem) as the
-   child process instead of the base `pythonw.exe`.
+On Windows, `pythonw.exe` inside a venv created by `uv venv` has the wrong PE subsystem. It uses
+the console subsystem (`IMAGE_SUBSYSTEM_WINDOWS_CUI`) instead of the GUI subsystem
+(`IMAGE_SUBSYSTEM_WINDOWS_GUI`). This causes a visible console window to flash or persist when
+running GUI applications, background tasks, or scheduled jobs.
 
-2. **Trampoline child spawning**: The trampoline's `spawn_child` function in `bounce.rs` calls
-   `CreateProcessA` with empty creation flags. When the child happens to be a console-subsystem
-   binary (e.g., `python.exe` fallback), Windows allocates a new console window even though the
-   parent is a GUI-subsystem process.
+**uv version:** 0.10.4 (and earlier)
+**OS:** Windows 11
 
-**Proposed Fix**
+### Minimal reproduction
 
-1. Add `is_gui` parameter to `replace_link_to_executable` and `create_link_to_executable` in
-   `managed.rs`, threading the correct subsystem type through from `WindowsExecutable::is_gui()`.
-2. Add `gui_executable()` helper in `virtualenv.rs` to resolve `pythonw.exe` from `python.exe`,
-   so GUI launchers target the correct GUI-subsystem base executable.
-3. Pass `CREATE_NO_WINDOW` in `spawn_child` when `is_gui=true` to prevent console window
-   allocation for fallback scenarios.
-4. Rebuild all prebuilt trampoline binaries.
-5. Add a `warn_user_once!` message when `pythonw.exe` is not found and `python.exe` is used as a
-   fallback for GUI scripts.
-6. Add PE subsystem validation test to prevent regressions.
-7. Document Windows launcher behavior in `docs/concepts/python-versions.md`.
+```console
+> uv venv .venv
+> python -c "import struct; f=open('.venv/Scripts/pythonw.exe','rb'); f.seek(0x3C); pe=struct.unpack('<I',f.read(4))[0]; f.seek(pe+0x5C); sub=struct.unpack('<H',f.read(2))[0]; print(f'Subsystem: {sub} (expected 2=GUI, got {sub})')"
+Subsystem: 3 (expected 2=GUI, got 3)
+```
 
-**Impact**
+The `pythonw.exe` trampoline reports subsystem 3 (console) instead of 2 (GUI). This can also be
+observed by running a simple tkinter script through the venv's `pythonw.exe` — an empty console
+window appears alongside the GUI:
 
-- GUI applications (tkinter, PyQt, wxPython, etc.) installed via `uv` will no longer show a
-  console window on launch.
-- Background tasks and scheduled jobs using `pythonw.exe` will run silently as expected.
-- No behavioral change for console (`python.exe`) usage.
+```console
+> uv venv .venv
+> echo "import tkinter; tkinter.Tk().mainloop()" > gui_test.py
+> .venv\Scripts\pythonw.exe gui_test.py
+# A console window flashes on screen alongside the tkinter window
+```
 
-**Testing**
+### Root cause
 
-- Unit tests for `WindowsExecutable::is_gui()` and `gui_executable()`.
-- PE subsystem validation test for all prebuilt trampoline binaries.
-- Manual verification on Windows with `uv venv` + `pythonw.exe` + a tkinter script.
+1. `replace_link_to_executable` in `virtualenv.rs` hardcodes `is_gui=false` for all trampoline
+   launchers, so `pythonw.exe` gets the console-subsystem trampoline. The trampoline also targets
+   `python.exe` as the child process instead of the base `pythonw.exe`.
+2. The trampoline's `spawn_child` in `bounce.rs` calls `CreateProcessA` with zero creation flags.
+   When the child is a console binary (e.g., `python.exe` fallback), Windows allocates a console
+   window even though the parent is a GUI process.
+
+## Related issues
+
+- astral-sh/uv#6801 — Provide an option to start `uv` on Windows without a console window
+- astral-sh/uv#6805 — Add an option to `uv run` to run a `.py` script with `pythonw.exe`
+
+These issues focus on `uv.exe` itself or `uv run` flags; this PR fixes the underlying venv
+launcher and trampoline subsystem, which is a prerequisite for correct GUI behavior.
+
+## Test plan
+
+- [ ] Unit tests for `WindowsExecutable::is_gui()` and `gui_executable()`
+- [ ] PE subsystem validation test for all six prebuilt trampoline binaries
+  (`prebuilt_trampolines_have_correct_subsystem`)
+- [ ] Manual verification: `uv venv` + `pythonw.exe` + tkinter script shows no console window
+- [ ] Verify no behavioral change for console (`python.exe`) usage
